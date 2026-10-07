@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulado - Lei de Diretrizes e Bases da Educação Nacional (LDB)</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d2a52">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!-- Firebase (Firestore + Authentication) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    min-height: 100vh;
+    color: #222;
+    padding: 20px;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.25);
+    overflow: hidden;
+  }
+  header {
+    background: #0d2a52;
+    color: #fff;
+    padding: 22px 28px;
+  }
+  header h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  header p { font-size: .9rem; opacity: .85; }
+  .progress-wrap {
+    background: #e5e9f0;
+    height: 10px;
+    border-radius: 5px;
+    margin: 18px 28px 0;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    transition: width .4s ease;
+  }
+  .info-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 28px;
+    font-size: .9rem;
+    color: #555;
+    border-bottom: 1px solid #eee;
+  }
+  main { padding: 28px; }
+  .question-card { display: none; }
+  .question-card.active { display: block; animation: fade .3s ease; }
+  @keyframes fade { from {opacity:0; transform:translateY(8px);} to {opacity:1; transform:none;} }
+  .q-number {
+    display: inline-block;
+    background: #0d2a52;
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: .85rem;
+    margin-bottom: 12px;
+  }
+  .q-context {
+    background: #f4f7fb;
+    border-left: 4px solid #2a5298;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+    font-size: .95rem;
+    line-height: 1.7;
+    color: #333;
+    text-align: justify;
+  }
+  .q-context p { margin-bottom: 12px; }
+  .q-context p:last-child { margin-bottom: 0; }
+  .q-text {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 18px;
+    line-height: 1.6;
+  }
+  .options { list-style: none; }
+  .options li {
+    background: #fafbfd;
+    border: 2px solid #e1e6ef;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .options li:hover { border-color: #2a5298; background: #eef3fb; }
+  .options li input { margin-top: 4px; cursor: pointer; accent-color: #2a5298; }
+  .options li label { cursor: pointer; flex: 1; line-height: 1.5; }
+  .options li.selected { border-color: #2a5298; background: #e0ebff; }
+  .options li.correct { border-color: #28a745; background: #e6f7ec; }
+  .options li.wrong { border-color: #dc3545; background: #fdecea; }
+  .feedback {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 8px;
+    font-size: .95rem;
+    line-height: 1.6;
+    display: none;
+  }
+  .feedback.show { display: block; }
+  .feedback.ok { background: #e6f7ec; color: #155724; border-left: 4px solid #28a745; }
+  .feedback.no { background: #fdecea; color: #721c24; border-left: 4px solid #dc3545; }
+  .nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 24px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #0d2a52;
+    color: #fff;
+    border: none;
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-size: .95rem;
+    cursor: pointer;
+    transition: background .2s;
+    font-weight: 500;
+  }
+  button:hover:not(:disabled) { background: #2a5298; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary { background: #6c757d; }
+  button.secondary:hover:not(:disabled) { background: #545b62; }
+  button.success { background: #28a745; }
+  button.success:hover:not(:disabled) { background: #218838; }
+  .start-screen, .result-screen { text-align: center; padding: 20px 10px; }
+  .start-screen h2 { color: #0d2a52; margin-bottom: 16px; font-size: 1.6rem; }
+  .start-screen p { margin-bottom: 14px; color: #555; line-height: 1.6; }
+  .start-screen ul { text-align: left; max-width: 500px; margin: 18px auto; color: #444; }
+  .start-screen li { margin-bottom: 8px; }
+  .result-screen h2 { color: #0d2a52; margin-bottom: 10px; }
+  .score-big { font-size: 3rem; font-weight: bold; color: #2a5298; margin: 18px 0; }
+  .score-bar {
+    width: 80%; max-width: 400px; height: 14px;
+    background: #e5e9f0; border-radius: 7px; margin: 10px auto 20px; overflow: hidden;
+  }
+  .score-fill { height: 100%; background: linear-gradient(90deg, #28a745, #20c997); }
+  .review-list { text-align: left; margin: 24px 0; }
+  .review-item {
+    background: #f8f9fa; border-left: 4px solid #ccc;
+    padding: 12px 14px; margin-bottom: 8px; border-radius: 6px; font-size: .9rem;
+  }
+  .review-item.ok { border-color: #28a745; }
+  .review-item.no { border-color: #dc3545; }
+  .review-item small { color: #666; display: block; margin-top: 4px; }
+  footer { text-align: center; padding: 14px; background: #f4f7fb; font-size: .8rem; color: #666; }
+  .gate-screen { text-align: center; padding: 30px 10px; }
+  .gate-screen h2 { color: #0d2a52; margin-bottom: 14px; font-size: 1.5rem; }
+  .gate-screen p { color: #555; line-height: 1.6; margin-bottom: 18px; max-width: 460px; margin-left: auto; margin-right: auto; }
+  .form-field { max-width: 380px; margin: 0 auto 16px; text-align: left; }
+  .form-field label { display: block; font-size: .85rem; color: #444; margin-bottom: 6px; font-weight: 600; }
+  .form-field input {
+    width: 100%; padding: 12px 14px; border: 2px solid #e1e6ef; border-radius: 8px;
+    font-size: 1rem; transition: border-color .2s;
+  }
+  .form-field input:focus { outline: none; border-color: #2a5298; }
+  .status-badge {
+    display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: .9rem;
+    font-weight: 600; margin-bottom: 16px;
+  }
+  .status-badge.pending { background: #fff3cd; color: #856404; }
+  .status-badge.rejected { background: #fdecea; color: #721c24; }
+  .status-badge.approved { background: #e6f7ec; color: #155724; }
+  .admin-table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: .9rem; }
+  .admin-table th, .admin-table td { padding: 10px 12px; border-bottom: 1px solid #eee; text-align: left; }
+  .admin-table th { background: #f4f7fb; color: #0d2a52; }
+  .admin-actions button { padding: 6px 12px; font-size: .82rem; margin-right: 6px; }
+  .admin-empty { color: #888; padding: 16px 0; font-style: italic; }
+  footer a { color: #2a5298; text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .error-msg { color: #dc3545; font-size: .88rem; margin-top: -8px; margin-bottom: 14px; display: none; }
+  .error-msg.show { display: block; }
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.15rem; }
+    main { padding: 18px; }
+    .score-big { font-size: 2.2rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>📘 Simulado — LDB (Lei 9.394/1996)</h1>
+    <p>58 questões contextualizadas • Múltipla escolha (A–E)</p>
+  </header>
+  <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="info-bar">
+    <span id="infoLeft">Aguardando início</span>
+    <span id="infoRight">58 questões</span>
+  </div>
+  <main id="main"></main>
+  <footer>Simulado educacional • Baseado na Lei 9.394/1996 (LDB) e suas alterações.
+    <br><a href="#" id="adminLink" onclick="openAdminLogin(); return false;">Área do administrador</a>
+  </footer>
+</div>
+
+<script>
+const Q=[{"c":"Durante uma reunião de planejamento pedagógico em uma escola municipal, uma professora recém-formada questionou por que o projeto político-pedagógico da unidade tratava a educação de forma tão ampla, mencionando até as rodas de capoeira promovidas pela associação de moradores do bairro e o aprendizado informal que as crianças levam de casa. A coordenadora pedagógica explicou que a própria Lei de Diretrizes e Bases da Educação Nacional, já em seu artigo inicial, adota um conceito de educação mais amplo do que o de simples escolarização, abrangendo processos formativos que ocorrem em diversos espaços sociais, e não apenas dentro da sala de aula.","t":"Segundo o art. 1º da LDB, a educação escolar deverá vincular-se ao mundo do trabalho e à:","o":["Prática social","Doutrina da situação irregular","Gestão exclusivamente privada do ensino","Formação estritamente religiosa","Avaliação seriada obrigatória"],"a":0,"e":"Art. 1º, §2º, da LDB: a educação escolar deverá vincular-se ao mundo do trabalho e à prática social. O caput já reconhece que a educação abrange os processos formativos que se desenvolvem na vida familiar, na convivência humana, no trabalho, nas instituições de ensino e pesquisa, nos movimentos sociais e organizações da sociedade civil e nas manifestações culturais."},{"c":"Em uma palestra para pais de alunos recém-matriculados, o diretor de uma escola estadual explicou os fundamentos constitucionais e legais da educação brasileira, destacando que a LDB reafirma, já em seu artigo 2º, que a educação é dever tanto da família quanto do Estado, devendo ser inspirada em determinados princípios. Um dos pais presentes perguntou, então, quais seriam exatamente essas finalidades centrais da educação segundo a lei, especialmente diante de cobranças excessivas de alguns responsáveis que viam a escola apenas como preparação para provas e concursos futuros.","t":"Segundo o art. 2º da LDB, a educação tem por finalidade o pleno desenvolvimento do educando, seu preparo para o exercício da cidadania e:","o":["Sua qualificação para o trabalho","Sua aprovação compulsória em exames nacionais","Sua filiação a partido político de sua escolha","Sua formação exclusivamente técnica","Sua preparação só para o ensino superior"],"a":0,"e":"Art. 2º da LDB: a educação, dever da família e do Estado, inspirada nos princípios de liberdade e nos ideais de solidariedade humana, tem por finalidade o pleno desenvolvimento do educando, seu preparo para o exercício da cidadania e sua qualificação para o trabalho."},{"c":"Em um conselho escolar, um pai de aluno com deficiência visual reclamou que a escola particular vizinha havia recusado a matrícula de seu filho, alegando 'falta de estrutura'. O diretor da escola pública, ao comentar o episódio em reunião pedagógica, destacou que a LDB elenca, em seu art. 3º, uma série de princípios que devem reger o ensino em todo o território nacional, entre eles exatamente aquele que impede esse tipo de discriminação e exige oferta de condições de acesso e permanência a todos, sem distinção de origem, raça, sexo, cor, idade ou qualquer outra forma de discriminação.","t":"Dentre os princípios do ensino previstos no art. 3º da LDB está:","o":["Igualdade de condições para o acesso e permanência na escola","Gestão exclusivamente centralizada pela União","Gratuidade restrita à educação superior","Obrigatoriedade apenas para o ensino médio","Vinculação do ensino a uma única corrente pedagógica oficial"],"a":0,"e":"Art. 3º, I, da LDB: o ensino será ministrado com base no princípio de igualdade de condições para o acesso e permanência na escola, vedando-se qualquer discriminação."},{"c":"Um grupo de professores de uma escola confessional, ao elaborar o currículo de Ensino Religioso, debateu internamente se poderia excluir, das discussões em sala, qualquer menção a correntes filosóficas ou pedagógicas divergentes da linha adotada pela mantenedora, sob o argumento de 'manter a coerência ideológica da instituição'. Um professor de Sociologia lembrou que, embora a escola tenha liberdade para definir sua proposta pedagógica, a LDB impõe um princípio que resguarda a livre circulação de ideias e correntes pedagógicas dentro do ambiente escolar, o que não poderia ser simplesmente suprimido.","t":"O princípio do art. 3º, III, da LDB, que resguarda a convivência de diferentes correntes de pensamento no ambiente escolar, é o:","o":["Pluralismo de ideias e de concepções pedagógicas","Monopólio estatal do ensino religioso","Princípio da reserva orçamentária mínima","Princípio da gratuidade universal e incondicionada","Princípio da uniformidade curricular nacional absoluta"],"a":0,"e":"Art. 3º, III, da LDB: pluralismo de ideias e de concepções pedagógicas é um dos princípios que devem reger o ensino, garantindo a convivência de diferentes correntes de pensamento nas instituições educacionais."},{"c":"Em uma audiência pública sobre eleição de diretores, representantes de pais, estudantes e servidores de uma escola estadual defenderam que a comunidade escolar deveria participar ativamente das decisões da unidade, por meio de conselhos escolares com poder deliberativo sobre o uso de recursos e o projeto pedagógico, e não apenas de forma consultiva ou decorativa. O secretário de educação, ao responder, reconheceu que esse tipo de participação é, de fato, um princípio expressamente previsto na LDB para a organização da educação nacional.","t":"Esse princípio, previsto no art. 3º, VIII, da LDB, é a:","o":["Gestão democrática do ensino público","Centralização administrativa plena","Privatização progressiva da rede pública","Vinculação obrigatória a partido político","Autonomia financeira irrestrita de cada professor"],"a":0,"e":"Art. 3º, VIII, da LDB: gestão democrática do ensino público, na forma desta Lei e da legislação dos sistemas de ensino, é um dos princípios do ensino nacional, detalhado no art. 14."},{"c":"Uma mãe, moradora de um município pequeno, procurou a Secretaria de Educação para reclamar que sua filha de 5 anos não conseguia vaga em creche pública havia meses, sendo informada verbalmente por um atendente que 'a educação infantil é só para quem sobra vaga, já que não é obrigatória'. Inconformada, a mãe acionou a Defensoria Pública, que explicou que, desde a Emenda Constitucional 59/2009, incorporada à redação do art. 4º da LDB, a obrigatoriedade e gratuidade da educação básica foram ampliadas para uma faixa etária bem mais larga do que apenas o ensino fundamental.","t":"Segundo o art. 4º, I, da LDB, o dever do Estado com a educação escolar pública será efetivado mediante a garantia de educação básica obrigatória e gratuita dos:","o":["4 (quatro) aos 17 (dezessete) anos de idade","6 (seis) aos 14 (catorze) anos de idade","7 (sete) aos 18 (dezoito) anos de idade","5 (cinco) aos 15 (quinze) anos de idade","Apenas a partir dos 6 (seis) anos de idade"],"a":0,"e":"Art. 4º, I, da LDB, com redação dada após a EC 59/2009: o dever do Estado com educação escolar pública será efetivado mediante a garantia de educação básica obrigatória e gratuita dos 4 aos 17 anos de idade, organizada da seguinte forma: pré-escola, ensino fundamental e ensino médio."},{"c":"Em uma comunidade rural distante de qualquer escola pública, um grupo de famílias relatou ao Ministério Público que seus filhos em idade escolar não tinham como se deslocar diariamente até a unidade mais próxima, situada a mais de quinze quilômetros, e que o Município nunca havia oferecido qualquer solução de transporte ou de nova unidade de ensino na região. O promotor, ao analisar o caso, destacou que o acesso à educação básica obrigatória é tratado pela LDB não como mera política pública discricionária, mas como algo de natureza jurídica mais forte, que autoriza, inclusive, a responsabilização da autoridade competente por omissão.","t":"Segundo o art. 5º da LDB, o acesso à educação básica obrigatória é direito público subjetivo, podendo qualquer cidadão, grupo de cidadãos, associação comunitária, organização sindical, entidade de classe ou outra legalmente constituída, e ainda o Ministério Público, acionar o poder público para:","o":["Exigi-lo","Apenas sugeri-lo em audiência pública","Solicitar indenização pecuniária aos pais","Pedir a extinção da rede municipal","Transferir a responsabilidade à iniciativa privada"],"a":0,"e":"Art. 5º, caput, da LDB: o acesso à educação básica obrigatória é direito público subjetivo, podendo qualquer cidadão, grupo de cidadãos, associação comunitária, organização sindical, entidade de classe ou outra legalmente constituída, e, ainda, o Ministério Público, acionar o poder público para exigi-lo."},{"c":"Um pai, alegando que preferia educar os três filhos, de 5, 8 e 11 anos, inteiramente em casa, sem qualquer vínculo com rede de ensino, foi notificado pelo Conselho Tutelar após a escola da região comunicar a ausência de matrícula das crianças. Em sua defesa, o pai alegou que a decisão sobre a educação dos filhos seria estritamente uma prerrogativa familiar, sem qualquer imposição estatal. O Conselho Tutelar, contudo, esclareceu que a LDB impõe expressamente aos pais ou responsáveis um dever específico quanto à matrícula dos menores, a partir de determinada idade, na educação básica.","t":"Segundo o art. 6º da LDB, é dever dos pais ou responsáveis efetuar a matrícula das crianças na educação básica a partir de:","o":["4 (quatro) anos de idade","6 (seis) anos de idade","7 (sete) anos de idade","5 (cinco) anos de idade","3 (três) anos de idade"],"a":0,"e":"Art. 6º da LDB: é dever dos pais ou responsáveis efetuar a matrícula das crianças na educação básica a partir dos 4 (quatro) anos de idade, em consonância com a ampliação da obrigatoriedade trazida pela EC 59/2009."},{"c":"Durante um curso de formação de gestores escolares, um palestrante do Ministério da Educação explicou as diferentes competências dentro do sistema federativo de ensino, destacando que cabe à União uma série de funções estratégicas de coordenação nacional, entre elas a elaboração do principal instrumento de planejamento educacional de longo prazo do país, com metas e estratégias decenais para todos os níveis e modalidades de ensino, aprovado por lei específica e monitorado periodicamente.","t":"Segundo o art. 9º, I, da LDB, incumbe à União elaborar o:","o":["Plano Nacional de Educação, em colaboração com os demais entes federados","Projeto político-pedagógico de cada escola municipal","Regimento interno de cada universidade privada","Calendário escolar de cada rede estadual","Plano de carreira de cada categoria docente"],"a":0,"e":"Art. 9º, I, da LDB: incumbe à União elaborar o Plano Nacional de Educação, em colaboração com os Estados, o Distrito Federal e os Municípios, hoje disciplinado pela Lei 13.005/2014."},{"c":"Um grupo de pesquisadores em políticas educacionais, ao comparar o desempenho de diferentes redes estaduais no SAEB (Sistema de Avaliação da Educação Básica), questionou por que caberia à própria União manter esse processo nacional de avaliação, e não a cada Estado avaliar isoladamente sua rede, sem qualquer parâmetro comparável nacionalmente. Um especialista explicou que essa atribuição está prevista expressamente entre as competências da União na LDB, justamente para permitir o monitoramento e a melhoria da qualidade do ensino em todo o país, de forma comparável entre as diferentes redes.","t":"Segundo o art. 9º, VI, da LDB, incumbe à União assegurar processo nacional de:","o":["Avaliação do rendimento escolar no ensino fundamental, médio e superior","Contratação direta de todos os professores do país","Fiscalização exclusiva de escolas particulares de educação infantil","Nomeação de todos os diretores de escolas municipais","Aprovação de livros didáticos sem qualquer análise pedagógica"],"a":0,"e":"Art. 9º, VI, da LDB: incumbe à União assegurar processo nacional de avaliação do rendimento escolar no ensino fundamental, médio e superior, em colaboração com os sistemas de ensino, objetivando a definição de prioridades e a melhoria da qualidade do ensino."},{"c":"Em uma reunião do Conselho Estadual de Educação, discutia-se a divisão de responsabilidades entre o Estado e os Municípios de determinada unidade federativa quanto à oferta de ensino fundamental, já que ambos vinham disputando, havia anos, a prioridade de atendimento em algumas regiões, gerando sobreposição de matrículas em alguns bairros e ausência de oferta em outros. Um conselheiro lembrou que a própria LDB já distribui, em dispositivos específicos, essas competências entre os entes federativos, cabendo aos Estados atuar prioritariamente no ensino fundamental e médio, e aos Municípios, prioritariamente na educação infantil e no ensino fundamental.","t":"Segundo os arts. 10 e 11 da LDB, a atuação prioritária dos Municípios deve se dar:","o":["Na educação infantil e no ensino fundamental","Exclusivamente no ensino superior","Exclusivamente no ensino médio e técnico","Apenas na educação de jovens e adultos noturna","Apenas na educação especial"],"a":0,"e":"Art. 11, V, da LDB: os Municípios incumbir-se-ão de oferecer a educação infantil em creches e pré-escolas, e, com prioridade, o ensino fundamental, permitida a atuação em outros níveis de ensino somente quando estiverem atendidas plenamente as necessidades de sua área de competência e com recursos acima dos percentuais mínimos vinculados pela Constituição Federal à manutenção e desenvolvimento do ensino."},{"c":"Uma mãe constatou que seu filho de 9 anos acumulava mais de 30 faltas consecutivas e injustificadas em uma escola municipal, sem que a direção tivesse tomado qualquer providência além de anotar as ausências no diário de classe. Ao ser questionada pela Defensoria Pública sobre por que não havia notificado o caso a nenhum órgão de proteção, a diretora alegou desconhecer qualquer obrigação legal nesse sentido, afirmando que 'a frequência é responsabilidade exclusiva da família'. A Defensoria, contudo, apontou que a própria LDB impõe aos estabelecimentos de ensino o dever de comunicar casos de evasão escolar e reiteração de faltas a órgãos específicos.","t":"Segundo o art. 12, VIII, da LDB, os estabelecimentos de ensino, respeitadas as normas comuns e as do seu sistema de ensino, terão a incumbência de notificar ao Conselho Tutelar do Município a relação dos alunos que apresentem quantidade de faltas acima de cinquenta por cento do percentual permitido em lei, bem como:","o":["Casos de evasão escolar","Apenas notas abaixo da média","Apenas atrasos superiores a dez minutos","Resultados de provas bimestrais","Reclamações de uniforme escolar"],"a":0,"e":"Art. 12, VIII, da LDB: os estabelecimentos de ensino terão a incumbência de notificar ao Conselho Tutelar do Município, ao juiz competente da Comarca e ao respectivo representante do Ministério Público a relação dos alunos que apresentem quantidade de faltas acima de 50% do percentual permitido em lei, bem como os casos de evasão escolar."},{"c":"Em uma escola estadual, um professor recém-contratado foi informado pela coordenação de que, além de ministrar as aulas previstas em sua carga horária, teria também a incumbência de participar da elaboração do projeto pedagógico do estabelecimento, de elaborar e cumprir seu próprio plano de trabalho segundo esse projeto, e de estabelecer estratégias de recuperação para os alunos de menor rendimento, entre outras atribuições. O professor, surpreso com o volume de responsabilidades além da sala de aula, questionou se isso estava mesmo previsto em lei ou se seria apenas uma exigência interna daquela escola específica.","t":"Essas incumbências dos docentes estão expressamente previstas no:","o":["Art. 13 da LDB","Art. 206 da Constituição Federal, exclusivamente","Código de Ética do professor particular","Estatuto da Criança e do Adolescente, exclusivamente","Regimento interno de cada sindicato"],"a":0,"e":"Art. 13 da LDB lista as incumbências dos docentes, entre elas participar da elaboração da proposta pedagógica do estabelecimento, elaborar e cumprir plano de trabalho, zelar pela aprendizagem dos alunos e estabelecer estratégias de recuperação para os de menor rendimento."},{"c":"Em assembleia geral de pais e professores de uma escola pública, um grupo de mães propôs a criação de um conselho escolar com poder de opinar sobre o uso de verbas e sobre o próprio projeto pedagógico da unidade, o que gerou resistência de parte da direção, que considerava essa participação 'uma invasão de competência técnica exclusiva dos educadores'. Uma professora de Direito, mãe de aluno, destacou que a própria LDB determina que os sistemas de ensino definam as normas de gestão democrática do ensino público, assegurando, entre outros pontos, a participação das comunidades escolar e local em conselhos escolares ou equivalentes.","t":"Segundo o art. 14 da LDB, os sistemas de ensino definirão as normas da gestão democrática do ensino público, atendidos dois princípios: participação dos profissionais da educação na elaboração do projeto pedagógico e:","o":["Participação das comunidades escolar e local em conselhos escolares ou equivalentes","Nomeação direta de diretores pelo governador, sem qualquer processo","Exclusão de pais do processo decisório da escola","Centralização total das decisões no Ministério da Educação","Vedação de qualquer órgão colegiado na escola"],"a":0,"e":"Art. 14, I e II, da LDB: participação dos profissionais da educação na elaboração do projeto pedagógico da escola e participação das comunidades escolar e local em conselhos escolares ou equivalentes."},{"c":"Um grupo de secretários municipais de educação, reunido em um seminário estadual, discutia como estruturar formalmente a rede de ensino de seus municípios, debatendo se bastava simplesmente manter escolas funcionando ou se seria necessário organizar, de fato, um sistema municipal de ensino próprio, com conselho municipal de educação, normas e órgão executivo específico. Um consultor jurídico esclareceu que, embora a LDB autorize a organização de sistemas municipais de ensino, isso depende de decisão formal de cada Município, que pode também optar por se integrar ao sistema estadual ou compor com ele um sistema único de educação básica.","t":"Segundo o art. 11, parágrafo único, da LDB, os Municípios poderão optar por:","o":["Integrar-se ao sistema estadual de ensino ou compor com ele um sistema único de educação básica","Delegar toda a educação básica à União, extinguindo sua própria rede","Transferir compulsoriamente todas as escolas para entidades filantrópicas","Suprimir completamente o ensino fundamental de sua competência","Submeter-se exclusivamente a normas de organismos internacionais"],"a":0,"e":"Art. 11, parágrafo único, da LDB: os Municípios poderão optar, ainda, por se integrar ao sistema estadual de ensino ou compor com ele um sistema único de educação básica."},{"c":"Em uma reportagem sobre a organização da educação nacional, um jornalista especializado em políticas públicas explicou aos leitores que a educação escolar brasileira, segundo a LDB, se compõe de dois grandes níveis, cada um subdividido em etapas e modalidades próprias, o que ajuda a entender, por exemplo, por que o ensino fundamental e o ensino médio seguem lógicas de organização distintas da educação superior, com regras específicas de ingresso, avaliação e certificação para cada nível.","t":"Segundo o art. 21 da LDB, a educação escolar compõe-se de dois níveis: educação superior e:","o":["Educação básica, formada pela educação infantil, ensino fundamental e ensino médio","Educação técnica, exclusivamente","Educação a distância, exclusivamente","Educação continuada de servidores públicos","Educação militar, exclusivamente"],"a":0,"e":"Art. 21 da LDB: a educação escolar compõe-se de: I - educação básica, formada pela educação infantil, ensino fundamental e ensino médio; II - educação superior."},{"c":"Durante uma capacitação de professores do ensino fundamental, a formadora explicou que a educação básica, segundo a LDB, tem finalidades amplas, que vão muito além da simples transmissão de conteúdos, incluindo assegurar a todos os educandos a formação comum indispensável para o exercício da cidadania e fornecer-lhes os meios para progredir no trabalho e em estudos posteriores, de modo articulado com o desenvolvimento geral do educando.","t":"Segundo o art. 22 da LDB, a educação básica tem por finalidades desenvolver o educando, assegurar-lhe a formação comum indispensável para o exercício da cidadania e fornecer-lhe meios para progredir no:","o":["Trabalho e em estudos posteriores","Serviço militar obrigatório, exclusivamente","Processo eleitoral, exclusivamente","Mercado financeiro internacional","Concurso público federal, exclusivamente"],"a":0,"e":"Art. 22 da LDB: a educação básica tem por finalidades desenvolver o educando, assegurar-lhe a formação comum indispensável para o exercício da cidadania e fornecer-lhe meios para progredir no trabalho e em estudos posteriores."},{"c":"Uma escola estadual decidiu reorganizar o ensino fundamental em ciclos de aprendizagem plurianuais, em vez de seguir rigidamente séries anuais, argumentando que isso favoreceria alunos com ritmos diferentes de aprendizagem. Alguns pais questionaram se essa reorganização seria legal, já que estavam acostumados ao sistema tradicional de séries. A direção explicou que a própria LDB permite expressamente essa flexibilidade de organização às instituições, desde que preservada a sequência do processo de aprendizagem.","t":"Segundo o art. 23 da LDB, a educação básica poderá organizar-se em séries anuais, períodos semestrais, ciclos, alternância regular de períodos de estudos, grupos não seriados, com base na idade, na competência e em outros critérios, ou por forma diversa de organização, sempre que:","o":["O interesse do processo de aprendizagem assim o recomendar","Houver autorização expressa do Ministério Público","O Município tiver mais de 500 mil habitantes","A escola for exclusivamente privada","Houver aprovação unânime dos pais em assembleia"],"a":0,"e":"Art. 23, caput, da LDB: a educação básica poderá organizar-se em séries anuais, períodos semestrais, ciclos, alternância regular de períodos de estudos, grupos não seriados, com base na idade, na competência e em outros critérios, ou por forma diversa de organização, sempre que o interesse do processo de aprendizagem assim o recomendar."},{"c":"Em uma escola de ensino fundamental, a secretaria escolar foi questionada por um pai sobre o número mínimo de dias de aula que a escola deveria cumprir ao longo do ano, já que ele suspeitava que a unidade estivesse somando apenas os dias de prova e eventos para completar o calendário, sem efetivo trabalho pedagógico. A secretária então apresentou o calendário escolar, demonstrando o cumprimento da carga horária mínima anual exigida, excluído o tempo de exames finais, e do número mínimo de dias de efetivo trabalho escolar previstos na LDB.","t":"Segundo o art. 24, I, da LDB, a carga horária mínima anual será de oitocentas horas, distribuída por um mínimo de:","o":["200 (duzentos) dias de efetivo trabalho escolar","100 (cem) dias de efetivo trabalho escolar","365 (trezentos e sessenta e cinco) dias corridos","150 (cento e cinquenta) dias de efetivo trabalho escolar","250 (duzentos e cinquenta) dias de efetivo trabalho escolar"],"a":0,"e":"Art. 24, I, da LDB: a carga horária mínima anual será de oitocentas horas para o ensino fundamental e para o ensino médio, distribuída por um mínimo de 200 dias de efetivo trabalho escolar, excluído o tempo reservado aos exames finais, quando houver."},{"c":"Uma rede estadual de ensino decidiu implantar, a partir de determinado ano, a jornada em tempo integral em diversas escolas de ensino médio, ampliando a carga horária anual muito além do mínimo legal, com disciplinas eletivas, projetos de vida e atividades de aprofundamento. Em reunião com a comunidade escolar, a Secretaria de Educação explicou que, embora a LDB estabeleça patamares mínimos de carga horária, nada impede que o poder público ou a própria escola ampliem progressivamente essa jornada, conforme política de fomento à educação em tempo integral.","t":"Segundo o art. 34, §2º, da LDB, a jornada escolar no ensino fundamental incluirá pelo menos quatro horas de trabalho efetivo em sala de aula, sendo progressivamente ampliado o número de escolas que ofereçam:","o":["Pelo menos sete horas diárias, com previsão de progressiva ampliação da jornada de educandos em tempo integral","Exclusivamente aulas noturnas","Apenas atividades recreativas sem conteúdo curricular","Jornada reduzida para duas horas diárias","Ensino semipresencial obrigatório a partir do 1º ano"],"a":0,"e":"Art. 34, §2º, da LDB: a jornada escolar no ensino fundamental incluirá pelo menos quatro horas de trabalho efetivo em sala de aula, sendo progressivamente ampliado o período de permanência na escola, buscando-se oferecer pelo menos sete horas diárias e ampliando-se o número de escolas em regime de tempo integral."},{"c":"Em uma reunião pedagógica de início de ano, a equipe de uma escola de ensino médio discutia como organizar a matriz curricular depois da reforma trazida pela Lei 13.415/2017, que alterou significativamente a estrutura dessa etapa da educação básica, introduzindo uma parte comum obrigatória em todo o país e permitindo que o restante da carga horária fosse organizado conforme o interesse dos próprios estudantes, por meio de percursos diversificados de aprofundamento.","t":"Segundo o art. 36 da LDB, o currículo do ensino médio será composto pela Base Nacional Comum Curricular e por:","o":["Itinerários formativos, organizados por meio da oferta de diferentes arranjos curriculares","Apenas disciplinas eletivas de educação física","Exclusivamente cursos técnicos profissionalizantes","Um único itinerário obrigatório igual em todo o país","Apenas atividades extracurriculares sem carga horária"],"a":0,"e":"Art. 36, caput, da LDB (redação da Lei 13.415/2017): o currículo do ensino médio será composto pela Base Nacional Comum Curricular e por itinerários formativos, que deverão ser organizados por meio da oferta de diferentes arranjos curriculares, conforme a relevância para o contexto local e a possibilidade dos sistemas de ensino."},{"c":"Uma adolescente de 17 anos, que havia abandonado os estudos aos 14 anos para trabalhar e ajudar no sustento da família, decidiu retomar sua trajetória escolar e buscou informações sobre como concluir o ensino fundamental por meio de exames, já que não desejava voltar a frequentar salas de aula regulares junto a alunos mais jovens. Na secretaria de educação, foi informada sobre a idade mínima exigida pela LDB para prestar esse tipo de exame supletivo.","t":"Segundo o art. 38, §1º, da LDB, os exames supletivos do ensino fundamental serão realizados para os maiores de:","o":["15 (quinze) anos","12 (doze) anos","21 (vinte e um) anos","10 (dez) anos","13 (treze) anos"],"a":0,"e":"Art. 38, §1º, I, da LDB: os exames supletivos do ensino fundamental serão realizados para os maiores de 15 anos; e, segundo o inciso II, do ensino médio, para os maiores de 18 anos."},{"c":"Um jovem de 19 anos, que nunca havia concluído o ensino médio por ter precisado trabalhar desde a adolescência, procurou um Centro Estadual de Educação de Jovens e Adultos (EJA) para retomar os estudos em horário noturno, compatível com sua rotina de trabalho diurno. O coordenador do centro explicou que essa modalidade específica de ensino é voltada justamente para pessoas que não tiveram acesso à educação básica na idade própria, assegurando oportunidades educacionais apropriadas, consideradas as características do alunado, seus interesses, condições de vida e de trabalho.","t":"Segundo o art. 37 da LDB, a educação de jovens e adultos será destinada àqueles que:","o":["Não tiveram acesso ou continuidade de estudos no ensino fundamental e médio na idade própria","Já concluíram o ensino superior e desejam uma segunda graduação","Têm entre 4 e 5 anos de idade","Estão cumprindo medida socioeducativa de internação, exclusivamente","São exclusivamente estrangeiros em situação migratória regular"],"a":0,"e":"Art. 37, caput, da LDB: a educação de jovens e adultos será destinada àqueles que não tiveram acesso ou continuidade de estudos no ensino fundamental e médio na idade própria."},{"c":"Uma indústria de médio porte firmou parceria com uma escola técnica estadual para oferecer vagas de estágio e, posteriormente, programas de qualificação profissional a estudantes do ensino médio, integrando formação geral e formação técnica em uma única trajetória. O diretor da escola técnica explicou aos pais, em reunião, que essa modalidade de educação, articulada com o ensino regular ou oferecida de forma subsequente e concomitante, é tratada na LDB como modalidade própria, conduzindo a diferentes itinerários formativos.","t":"A educação profissional e tecnológica, segundo o art. 39 da LDB, integra-se aos diferentes níveis e modalidades de educação, abrangendo cursos de:","o":["Formação inicial e continuada ou qualificação profissional, educação profissional técnica de nível médio e educação profissional tecnológica de graduação e pós-graduação","Educação infantil, exclusivamente","Apenas pós-doutorado em universidades públicas","Apenas cursos preparatórios para concursos públicos","Exclusivamente ensino religioso confessional"],"a":0,"e":"Art. 39, §2º, da LDB: a educação profissional e tecnológica abrange cursos de formação inicial e continuada ou qualificação profissional; educação profissional técnica de nível médio; e educação profissional tecnológica de graduação e pós-graduação."},{"c":"Em uma universidade pública, um aluno de graduação questionou por que, além das aulas regulares de seu curso, a instituição também oferecia cursos de extensão abertos à comunidade externa, sem exigência de vestibular, e cursos sequenciais por campo de saber, de curta duração. Um coordenador acadêmico explicou que a própria LDB reconhece diferentes formatos de cursos e programas na educação superior, cada um com finalidades e formas de acesso distintas.","t":"Segundo o art. 44 da LDB, a educação superior abrangerá, entre outros, cursos sequenciais por campo de saber, cursos de graduação, cursos de pós-graduação e cursos de:","o":["Extensão, abertos a candidatos que atendam aos requisitos estabelecidos pelas instituições de ensino","Alfabetização de adultos, exclusivamente","Educação infantil integrada ao campus","Ensino fundamental noturno supletivo","Formação continuada de conselheiros tutelares, exclusivamente"],"a":0,"e":"Art. 44, IV, da LDB: a educação superior abrangerá cursos de extensão, abertos a candidatos que atendam aos requisitos estabelecidos em cada caso pelas instituições de ensino, além dos cursos sequenciais, de graduação e de pós-graduação."},{"c":"Durante o processo de recredenciamento de uma faculdade privada, o Ministério da Educação realizou avaliação periódica das condições de oferta dos cursos, verificando infraestrutura, corpo docente e projeto pedagógico, podendo, inclusive, suspender temporariamente novas matrículas em caso de constatação de irregularidades graves. A mantenedora da faculdade questionou se esse controle estatal periódico sobre instituições privadas de ensino superior encontrava amparo legal, já que se tratava de iniciativa privada.","t":"Segundo o art. 46 da LDB, a autorização e o reconhecimento de cursos, bem como o credenciamento de instituições de educação superior, terão prazos limitados, sendo renovados periodicamente após processo regular de:","o":["Avaliação","Licitação pública","Votação popular direta","Aprovação legislativa específica","Consulta sindical"],"a":0,"e":"Art. 46, caput, da LDB: a autorização e o reconhecimento de cursos, bem como o credenciamento de instituições de educação superior, terão prazos limitados, sendo renovados periodicamente após processo regular de avaliação."},{"c":"Um grupo de alunos de uma universidade pública, insatisfeitos com uma decisão do colegiado sobre a estrutura curricular do curso, questionou se o Ministério da Educação poderia simplesmente determinar, de forma centralizada, qual metodologia de ensino a universidade deveria adotar em cada disciplina. Um professor de Direito Administrativo esclareceu que as universidades gozam de um atributo específico, assegurado constitucional e legalmente, que lhes garante liberdade para definir seus próprios currículos, programas e metodologias de ensino, pesquisa e extensão, sem ingerência externa indevida.","t":"Segundo o art. 53 da LDB, no exercício de sua autonomia, são asseguradas às universidades, sem prejuízo de outras, a atribuição de criar, organizar e extinguir, em sua sede, cursos e programas de educação superior, obedecendo às normas gerais da União e, quando for o caso, do respectivo sistema de ensino, atributo este decorrente da:","o":["Autonomia didático-científica, administrativa e de gestão financeira e patrimonial das universidades","Subordinação hierárquica direta ao Ministério da Educação","Delegação revogável a qualquer momento pelo reitor","Aprovação prévia obrigatória do Congresso Nacional para cada curso","Autorização específica do Conselho Tutelar local"],"a":0,"e":"Art. 53, caput, da LDB, em harmonia com o art. 207 da Constituição Federal: as universidades gozam de autonomia didático-científica, administrativa e de gestão financeira e patrimonial, podendo criar, organizar e extinguir cursos e programas de educação superior."},{"c":"Em uma avaliação institucional de uma universidade pública, constatou-se que apenas 20% do corpo docente possuía título de mestre ou doutor, o que gerou questionamentos de uma comissão externa de avaliação sobre o cumprimento dos requisitos mínimos de qualificação docente exigidos para instituições que se autodenominam universidades, distintas de faculdades isoladas ou centros universitários, que podem ter exigências diversas.","t":"Segundo o art. 52 da LDB, as universidades caracterizam-se por um terço do corpo docente, pelo menos, com titulação acadêmica de mestrado ou doutorado, e por:","o":["Um terço do corpo docente em regime de tempo integral","Totalidade do corpo docente com doutorado pleno","Ausência de qualquer exigência de titulação mínima","Exclusividade de contratação de docentes estrangeiros","Dedicação exclusiva de todos os docentes ao magistério superior privado"],"a":0,"e":"Art. 52, II, da LDB: as universidades são instituições pluridisciplinares, caracterizando-se por um terço do corpo docente, pelo menos, com titulação acadêmica de mestrado ou doutorado, e por um terço do corpo docente em regime de tempo integral."},{"c":"Uma criança de 6 anos, diagnosticada com deficiência auditiva, foi matriculada em uma escola regular da rede municipal, que passou a disponibilizar professor de apoio especializado em Língua Brasileira de Sinais (Libras) e material didático adaptado, evitando qualquer segregação em turma ou instituição exclusivamente especial, exceto quando, avaliado o caso, não fosse possível a integração nas classes comuns do ensino regular. A mãe da criança, satisfeita com o atendimento, questionou se esse modelo de inclusão era uma simples política da escola ou algo determinado por lei.","t":"Segundo o art. 58 da LDB, entende-se por educação especial, para os efeitos desta lei, a modalidade de educação escolar oferecida preferencialmente na rede regular de ensino, para educandos com deficiência, transtornos globais do desenvolvimento e:","o":["Altas habilidades ou superdotação","Apenas dificuldades disciplinares comportamentais","Apenas defasagem idade-série superior a três anos","Exclusivamente alunos estrangeiros não falantes de português","Apenas alunos reprovados mais de duas vezes consecutivas"],"a":0,"e":"Art. 58, caput, da LDB: entende-se por educação especial, para os efeitos desta Lei, a modalidade de educação escolar oferecida preferencialmente na rede regular de ensino, para educandos com deficiência, transtornos globais do desenvolvimento e altas habilidades ou superdotação."},{"c":"Uma escola estadual recebeu um aluno com altas habilidades em matemática, que terminava as atividades propostas muito antes dos colegas e demonstrava sinais de desmotivação por falta de desafios adequados ao seu ritmo de aprendizagem. A equipe pedagógica, orientada pelo núcleo de educação especial da Secretaria de Educação, passou a estudar a possibilidade de aceleração de estudos para concluir, em menor tempo, o programa escolar daquele aluno, conforme autorizado pelos sistemas de ensino para esse perfil específico de educando.","t":"Segundo o art. 59 da LDB, os sistemas de ensino assegurarão aos educandos com deficiência, transtornos globais do desenvolvimento e altas habilidades ou superdotação, entre outras medidas, currículos, métodos, técnicas, recursos educativos e organização específicos para atender às suas necessidades, bem como a:","o":["Aceleração de estudos aos superdotados para conclusão em menor tempo do programa escolar","Exclusão compulsória da rede regular de ensino","Proibição de qualquer avaliação diferenciada","Retenção automática na mesma série por dois anos","Transferência obrigatória para instituição filantrópica"],"a":0,"e":"Art. 59, II, da LDB: os sistemas de ensino assegurarão aos educandos com altas habilidades ou superdotação a aceleração de estudos para conclusão em menor tempo do programa escolar, entre outras medidas de atendimento especializado."},{"c":"Um professor de escola pública, recém-ingressado na rede estadual apenas com formação em nível médio na modalidade normal (antigo magistério), foi informado de que poderia atuar temporariamente na educação infantil e nos primeiros anos do ensino fundamental, mas que, para progredir na carreira e atuar em outras etapas, precisaria buscar formação em nível superior, em curso de licenciatura, conforme exigido como regra geral pela LDB para a formação de docentes da educação básica.","t":"Segundo o art. 62 da LDB, a formação de docentes para atuar na educação básica far-se-á em nível superior, em curso de licenciatura, admitida, como formação mínima para o exercício do magistério na educação infantil e nos cinco primeiros anos do ensino fundamental, a oferecida em nível:","o":["Médio, na modalidade normal","Fundamental, sem qualquer formação específica","Técnico em áreas não relacionadas à educação","Superior, exclusivamente em bacharelado sem licenciatura","Pós-graduação stricto sensu obrigatória"],"a":0,"e":"Art. 62, caput, da LDB: a formação de docentes para atuar na educação básica far-se-á em nível superior, em curso de licenciatura, admitida como formação mínima para o exercício do magistério na educação infantil e nos cinco primeiros anos do ensino fundamental a oferecida em nível médio, na modalidade normal."},{"c":"Em uma assembleia do sindicato dos professores de uma rede municipal, os docentes reivindicavam que parte de sua carga horária contratual fosse destinada a atividades fora da sala de aula, como planejamento de aulas, correção de atividades e reuniões pedagógicas, e não apenas ao tempo efetivo de aula com os alunos. O sindicato lembrou que essa reivindicação já encontra respaldo expresso na LDB, que trata da valorização dos profissionais da educação e da necessidade de reservar tempo específico para esse tipo de atividade extraclasse.","t":"Segundo o art. 67, §único, da LDB, a União, os Estados, o Distrito Federal e os Municípios adotarão mecanismos facilitadores de acesso e permanência em cursos de formação, bem como deverão garantir, nos planos de carreira, período reservado a estudos, planejamento e avaliação, incluído na carga de trabalho, conhecido popularmente como:","o":["Hora-atividade","Hora extra irredutível","Jornada compensatória de férias","Licença-prêmio quinquenal","Adicional de insalubridade docente"],"a":0,"e":"Art. 67, §1º (também referido informalmente em §único de redações anteriores), da LDB determina que os sistemas de ensino promovam a valorização dos profissionais da educação, assegurando-lhes, inclusive nos termos dos estatutos e planos de carreira, período reservado a estudos, planejamento e avaliação, incluído na carga de trabalho, prática conhecida como 'hora-atividade'."},{"c":"Um grupo de vereadores de um município debatia o percentual mínimo de receita de impostos que deveria ser, obrigatoriamente, destinado à manutenção e ao desenvolvimento do ensino, já que parte da bancada queria reduzir esse percentual para abrir espaço orçamentário a outras áreas, alegando 'autonomia municipal sobre o próprio orçamento'. A Procuradoria do Município alertou que esse percentual mínimo não é uma escolha política discricionária, mas uma vinculação constitucional reproduzida também na LDB, sob pena de responsabilidade do gestor público.","t":"Segundo o art. 69 da LDB, em consonância com a Constituição Federal, a União aplicará, anualmente, nunca menos de 18%, e os Estados, o Distrito Federal e os Municípios, pelo menos 25% da receita resultante de impostos, na manutenção e desenvolvimento do:","o":["Ensino","Transporte público municipal","Sistema prisional estadual","Serviço de limpeza urbana","Turismo regional"],"a":0,"e":"Art. 69, caput, da LDB: a União aplicará, anualmente, nunca menos de dezoito, e os Estados, o Distrito Federal e os Municípios, vinte e cinco por cento, ou o que consta nas respectivas Constituições ou Leis Orgânicas, da receita resultante de impostos, na manutenção e desenvolvimento do ensino público."},{"c":"Durante uma auditoria do Tribunal de Contas, verificou-se que um município havia contabilizado, como despesa de manutenção e desenvolvimento do ensino, os gastos com merenda escolar oferecida aos alunos da rede pública, o que gerou dúvida de um auditor menos experiente sobre a correção desse lançamento contábil, já que a alimentação escolar poderia parecer, à primeira vista, um programa suplementar e não uma despesa diretamente educacional.","t":"Segundo o art. 70 da LDB, considerar-se-ão como de manutenção e desenvolvimento do ensino as despesas realizadas com vistas à consecução dos objetivos básicos das instituições educacionais de todos os níveis, compreendendo, entre outras, as realizadas com aquisição de material didático-escolar e manutenção de programas de transporte escolar, bem como:","o":["Remuneração e aperfeiçoamento do pessoal docente e demais profissionais da educação","Pagamento de aposentadorias de qualquer categoria profissional","Construção de hospitais municipais","Subvenção a partidos políticos","Pavimentação de vias públicas em geral"],"a":0,"e":"Art. 70 da LDB lista as despesas consideradas de manutenção e desenvolvimento do ensino, incluindo remuneração e aperfeiçoamento do pessoal docente, aquisição de material didático-escolar, manutenção de programas de transporte escolar, entre outras diretamente vinculadas aos objetivos educacionais."},{"c":"Em uma prestação de contas municipal, um vereador da oposição questionou por que determinados gastos com assistência médico-odontológica aos servidores da educação e com programas de merenda realizados fora do âmbito escolar não haviam sido contabilizados como despesa de manutenção e desenvolvimento do ensino, mesmo beneficiando, em parte, profissionais da área educacional. A Secretaria de Fazenda esclareceu que a própria LDB exclui expressamente certos tipos de gastos desse cômputo, ainda que relacionados indiretamente à rede de ensino.","t":"Segundo o art. 71 da LDB, não constituirão despesas de manutenção e desenvolvimento do ensino aquelas realizadas com programas suplementares de alimentação, assistência médico-odontológica, farmacêutica e psicológica, e outras formas de:","o":["Assistência social","Capacitação continuada de professores em exercício","Aquisição de livros didáticos para a biblioteca escolar","Construção de salas de aula","Pagamento de salários de professores efetivos"],"a":0,"e":"Art. 71, IV, da LDB: não constituirão despesas de manutenção e desenvolvimento do ensino aquelas realizadas com programas suplementares de alimentação, assistência médico-odontológica, farmacêutica e psicológica, e outras formas de assistência social."},{"c":"Um casal de pais, moradores de uma grande cidade, procurava vaga para o filho de 3 anos em creche pública e foi informado pela Secretaria de Educação de que a demanda superava amplamente a oferta de vagas na rede municipal, gerando fila de espera de mais de dois anos. Ao buscar orientação jurídica, o casal foi informado de que a oferta de creche, embora dever do Município, não compõe a faixa etária de obrigatoriedade escolar fixada constitucionalmente, diferentemente da pré-escola, que atende crianças de 4 e 5 anos e integra a educação básica obrigatória desde a Emenda Constitucional 59/2009.","t":"Segundo o art. 30 da LDB, a educação infantil será oferecida em creches, para crianças de até 3 anos de idade, e em pré-escolas, para crianças de:","o":["4 (quatro) a 5 (cinco) anos de idade","6 (seis) a 7 (sete) anos de idade","2 (dois) a 3 (três) anos de idade","5 (cinco) a 7 (sete) anos de idade","3 (três) a 6 (seis) anos de idade"],"a":0,"e":"Art. 30 da LDB: a educação infantil será oferecida em creches, para crianças de até três anos de idade, e pré-escolas, para crianças de quatro a cinco anos de idade."},{"c":"Em uma pré-escola municipal, uma professora foi questionada por uma mãe sobre por que seu filho de 4 anos não havia 'repetido o ano' mesmo apresentando dificuldades em algumas atividades propostas, já que a mãe estava acostumada à lógica de reprovação do ensino fundamental. A professora explicou que, na educação infantil, a avaliação segue lógica própria, de acompanhamento e registro do desenvolvimento da criança, sem qualquer objetivo de retenção ou promoção, mesmo para o acesso ao ensino fundamental.","t":"Segundo o art. 31 da LDB, na educação infantil a avaliação far-se-á mediante acompanhamento e registro do seu desenvolvimento, sem o objetivo de:","o":["Promoção, mesmo para o acesso ao ensino fundamental","Diagnóstico de eventuais necessidades especiais da criança","Comunicação do desenvolvimento aos pais ou responsáveis","Planejamento pedagógico pela própria instituição","Observação da interação da criança com os colegas"],"a":0,"e":"Art. 31, I, da LDB: na educação infantil, a avaliação far-se-á mediante acompanhamento e registro do desenvolvimento das crianças, sem o objetivo de promoção, mesmo para o acesso ao ensino fundamental."},{"c":"Um grupo de pais de uma escola de ensino fundamental questionou a direção sobre os objetivos pedagógicos gerais dessa etapa de ensino, já que notavam que o currículo incluía desde alfabetização e matemática básica até temas de meio ambiente, saúde e convivência social, parecendo, à primeira vista, dispersivo. A coordenação pedagógica explicou que a própria LDB define, em um único artigo, objetivos amplos e articulados para o ensino fundamental, que vão desde o domínio da leitura, escrita e cálculo até a compreensão do ambiente natural e social.","t":"Segundo o art. 32 da LDB, o ensino fundamental, de 9 (nove) anos de duração, tem por objetivo a formação básica do cidadão, mediante o desenvolvimento da capacidade de aprender, tendo como meios básicos o pleno domínio da leitura, da escrita e do cálculo, a compreensão do ambiente natural e social, do sistema político, das artes, e:","o":["O fortalecimento dos vínculos de família, dos laços de solidariedade humana e de tolerância recíproca","A aprovação compulsória em exame vestibular nacional","A formação exclusivamente técnica para o mercado de trabalho","A filiação obrigatória a entidades estudantis","A conclusão antecipada do ensino médio"],"a":0,"e":"Art. 32, caput e inciso IV, da LDB: o ensino fundamental tem por objetivo a formação básica do cidadão, mediante o desenvolvimento da capacidade de aprender, o pleno domínio da leitura, escrita e cálculo, a compreensão do ambiente natural, social, do sistema político, das artes e dos valores em que se fundamenta a sociedade, e o fortalecimento dos vínculos de família, dos laços de solidariedade humana e de tolerância recíproca."},{"c":"Uma escola particular, ao organizar o currículo do ensino fundamental, decidiu incluir conteúdos de história e cultura afro-brasileira e indígena de forma transversal em diversas disciplinas, e não apenas como um tópico isolado em uma única aula ao longo do ano. Um pai questionou se isso seria uma escolha pedagógica facultativa da escola ou uma exigência legal, já que outras escolas da região pareciam tratar o tema de forma mais superficial.","t":"Segundo o art. 26-A da LDB, nos estabelecimentos de ensino fundamental e de ensino médio, públicos e privados, torna-se obrigatório o estudo da:","o":["História e cultura afro-brasileira e indígena","Língua estrangeira moderna exclusivamente a partir do ensino médio","Educação financeira como disciplina isolada obrigatória","Educação para o trânsito como disciplina isolada obrigatória","Educação ambiental exclusivamente em escolas rurais"],"a":0,"e":"Art. 26-A, caput, da LDB (redação dada pela Lei 11.645/2008): nos estabelecimentos de ensino fundamental e de ensino médio, públicos e privados, torna-se obrigatório o estudo da história e cultura afro-brasileira e indígena."},{"c":"Em uma escola municipal, o currículo era organizado com uma parte definida nacionalmente, igual para todas as escolas do país, e outra parte flexível, que a própria rede ou escola poderia adaptar conforme características regionais e locais da sociedade, da cultura, da economia e dos educandos. Um professor recém-chegado de outro estado notou que, apesar da base comum, havia conteúdos específicos sobre a história local que não encontrou em sua escola anterior, o que o levou a pesquisar como a LDB disciplina essa composição curricular.","t":"Segundo o art. 26 da LDB, os currículos da educação infantil, do ensino fundamental e do ensino médio devem ter base nacional comum, a ser complementada, em cada sistema de ensino e em cada estabelecimento escolar, por:","o":["Uma parte diversificada, exigida pelas características regionais e locais da sociedade, da cultura, da economia e dos educandos","Uma parte exclusivamente definida pelos pais de cada aluno individualmente","Nenhuma complementação, sendo o currículo nacional absolutamente uniforme","Conteúdos escolhidos por sorteio anual entre os professores","Apenas disciplinas de livre escolha dos próprios alunos, sem qualquer parâmetro"],"a":0,"e":"Art. 26, caput, da LDB: os currículos da educação infantil, do ensino fundamental e do ensino médio devem ter base nacional comum, a ser complementada, em cada sistema de ensino e em cada estabelecimento escolar, por uma parte diversificada, exigida pelas características regionais e locais da sociedade, da cultura, da economia e dos educandos."},{"c":"Um aluno do ensino médio, atleta de natação em nível competitivo, solicitou à escola dispensa das aulas regulares de educação física, alegando já praticar a modalidade de forma intensiva fora do ambiente escolar, inclusive em treinos federados. A coordenação pedagógica, ao analisar o pedido, verificou que a LDB realmente prevê hipótese de dispensa da prática da educação física, mas vinculada a critérios específicos definidos pelos sistemas de ensino, não bastando a mera alegação informal do próprio aluno.","t":"Segundo o art. 26, §3º, da LDB, a educação física, integrada à proposta pedagógica da escola, é componente curricular obrigatório da educação básica, sendo sua prática facultativa ao aluno que comprove, entre outras hipóteses previstas em lei, que já pratica atividade física equivalente, segundo critérios definidos pelo:","o":["Sistema de ensino","Ministério da Defesa","Comitê Olímpico Brasileiro, exclusivamente","Conselho Tutelar do Município","Clube esportivo frequentado pelo aluno"],"a":0,"e":"Art. 26, §3º, da LDB: a educação física, integrada à proposta pedagógica da escola, é componente curricular obrigatório da educação básica, sendo sua prática facultativa, entre outras hipóteses, ao aluno que comprove já praticar atividade física equivalente, segundo critérios definidos nos sistemas de ensino."},{"c":"Em uma reunião de pais, uma mãe questionou por que a escola de seu filho havia incluído, na grade do ensino fundamental, atividades de promoção do desporto educacional e apoio às práticas desportivas não formais, além das aulas tradicionais de educação física, perguntando se isso fazia parte do currículo obrigatório ou era apenas uma atividade extracurricular facultativa oferecida pela unidade.","t":"Segundo o art. 27 da LDB, os conteúdos curriculares da educação básica observarão, entre outras diretrizes, a difusão de valores fundamentais ao interesse social, aos direitos e deveres dos cidadãos, de respeito ao bem comum e à ordem democrática, considerações sobre a condição e os direitos das crianças e dos adolescentes, e a:","o":["Orientação para o trabalho","Formação exclusivamente militar","Filiação sindical obrigatória","Preparação exclusiva para o vestibular","Formação religiosa confessional obrigatória"],"a":0,"e":"Art. 27 da LDB estabelece diretrizes gerais para os conteúdos curriculares da educação básica, incluindo difusão de valores sociais, considerações sobre direitos da criança e do adolescente e orientação para o trabalho, observadas as condições do educando."},{"c":"Uma escola particular de ensino médio, interessada em modernizar sua oferta pedagógica, passou a disponibilizar parte da carga horária de determinados itinerários formativos por meio de atividades a distância, mantendo, contudo, a maior parte da jornada escolar em formato presencial, conforme autorizado por normas específicas dos sistemas de ensino. Um pai questionou se o ensino médio poderia, em algum momento, ser oferecido de forma totalmente a distância para alunos regularmente matriculados na faixa etária própria dessa etapa.","t":"Segundo o art. 36, §5º, da LDB, a critério dos sistemas de ensino, a oferta de formação com ênfase técnica e profissional considerará:","o":["A contextualização e flexibilização de distintas ofertas, inclusive a possibilidade de concomitância com a educação profissional","A proibição absoluta de qualquer parceria com instituições de educação profissional","A obrigatoriedade de conclusão do ensino médio em dois anos","A exclusão de disciplinas de ciências humanas do itinerário técnico","A vedação de qualquer carga horária a distância em qualquer hipótese"],"a":0,"e":"Art. 36, §§5º e 6º, da LDB (redação da Lei 13.415/2017) tratam da flexibilização dos itinerários formativos do ensino médio, inclusive quanto à articulação com a educação profissional técnica, observadas normas dos respectivos sistemas de ensino."},{"c":"Em uma escola estadual, a diretora recebeu uma denúncia de que um professor estaria ministrando, sistematicamente, apenas conteúdos de uma única corrente religiosa em suas aulas de Ensino Religioso, desrespeitando o caráter facultativo dessa disciplina para os alunos e constrangendo quem não professava aquela fé a participar das atividades. A diretora, ao investigar o caso, confirmou que a matrícula na disciplina deveria respeitar a manifestação de vontade do próprio aluno ou de seus responsáveis, conforme expressamente previsto na LDB.","t":"Segundo o art. 33 da LDB, o ensino religioso, de matrícula facultativa, é parte integrante da formação básica do cidadão e constitui disciplina dos horários normais das escolas públicas de ensino:","o":["Fundamental","Superior, exclusivamente","Técnico profissionalizante, exclusivamente","Infantil, exclusivamente","Militar, exclusivamente"],"a":0,"e":"Art. 33, caput, da LDB: o ensino religioso, de matrícula facultativa, é parte integrante da formação básica do cidadão, constitui disciplina dos horários normais das escolas públicas de ensino fundamental, assegurado o respeito à diversidade cultural religiosa do Brasil, vedadas quaisquer formas de proselitismo."},{"c":"Um Município de pequeno porte, com orçamento limitado, decidiu investir recursos significativos em tecnologia educacional, implantando plataformas digitais de apoio ao ensino presencial em suas escolas de ensino fundamental, como complemento às aulas tradicionais, e não como substituição integral da presença física dos alunos em sala. A Secretaria de Educação questionou qual seria o tratamento dado pela LDB à educação a distância nessa etapa da educação básica, já que havia dúvidas sobre os limites dessa utilização.","t":"Segundo o art. 32, §4º, da LDB, o ensino fundamental será presencial, sendo o ensino a distância utilizado como complementação da aprendizagem ou em situações emergenciais, ficando sua oferta condicionada à:","o":["Observância das condições estabelecidas pela regulamentação específica expedida pelos entes federativos","Proibição total e irrestrita, sem qualquer exceção legal","Aprovação unânime dos pais em assembleia geral","Exclusiva utilização em escolas particulares de elite","Substituição integral e definitiva das aulas presenciais"],"a":0,"e":"Art. 32, §4º, da LDB: o ensino fundamental será presencial, sendo o ensino a distância utilizado como complementação da aprendizagem ou em situações emergenciais, ficando sua oferta condicionada à observância das condições estabelecidas pela regulamentação específica."},{"c":"Durante uma crise sanitária que exigiu suspensão temporária das aulas presenciais, diversas redes de ensino passaram a adotar atividades remotas emergenciais para não interromper totalmente o calendário escolar. Passado o período crítico, uma comissão de educadores discutiu se essas aulas remotas emergenciais deveriam permanecer como modelo definitivo, ou se a presencialidade continuava sendo a regra geral da educação básica segundo a legislação de regência, sendo o ensino remoto tratado como excepcional.","t":"À luz do art. 32, §4º, da LDB, a utilização de ensino a distância no ensino fundamental, ainda que emergencialmente adotada em larga escala, não afasta a regra geral de que essa etapa da educação básica deve ser, como regra:","o":["Presencial","Exclusivamente noturna","Exclusivamente semestral","Exclusivamente ministrada por voluntários","Exclusivamente gratuita em instituições privadas"],"a":0,"e":"Art. 32, §4º, da LDB mantém a presencialidade como regra do ensino fundamental, tratando o ensino a distância como complementar ou emergencial, sujeito a regulamentação específica, e não como substituto permanente da educação presencial."},{"c":"Em um processo seletivo para ingresso em cargo de gestão escolar, um candidato foi questionado sobre as competências normativas da União em matéria educacional, especialmente quanto à definição de conteúdos mínimos que deveriam ser ensinados em todas as escolas do país, independentemente da região, de modo a assegurar formação básica comum e respeito aos valores culturais e artísticos nacionais e regionais.","t":"Segundo o art. 9º, IV, da LDB, incumbe à União estabelecer, em colaboração com os Estados, o Distrito Federal e os Municípios, competências e diretrizes para a educação infantil, o ensino fundamental e o ensino médio, que nortearão os currículos e seus conteúdos mínimos, de modo a assegurar formação básica comum, previsão que deu origem, na prática, à:","o":["Base Nacional Comum Curricular (BNCC)","Lei de Acesso à Informação","Convenção Internacional sobre os Direitos da Criança, exclusivamente","Política Nacional de Assistência Social","Lei Geral de Proteção de Dados aplicada às escolas"],"a":0,"e":"Art. 9º, IV, da LDB fundamenta a elaboração, pela União, em colaboração com os demais entes federados, de diretrizes curriculares nacionais, concretizadas atualmente na Base Nacional Comum Curricular (BNCC), instituída por meio de Resolução do Conselho Nacional de Educação."},{"c":"Uma escola estadual, situada em região de forte presença de comunidades indígenas, passou a adaptar parte de seu currículo e de sua organização escolar para atender às especificidades culturais e linguísticas dessas comunidades, incluindo material didático bilíngue e calendário escolar compatível com práticas culturais tradicionais locais. A direção explicou aos demais pais que esse tratamento diferenciado é expressamente previsto na LDB como modalidade própria de organização da educação escolar indígena.","t":"Segundo o art. 78 da LDB, o Sistema de Ensino da União, com a colaboração das agências federais de fomento à cultura e de assistência aos povos indígenas, desenvolverá programas integrados de ensino e pesquisa, para oferta de educação escolar bilíngue e intercultural aos povos indígenas, com os seguintes objetivos, entre outros: proporcionar aos índios a recuperação de suas memórias históricas, a reafirmação de suas identidades étnicas, a valorização de suas línguas e ciências, e:","o":["O acesso às informações, conhecimentos técnicos e científicos da sociedade nacional e demais sociedades indígenas e não-índias","A obrigatoriedade de abandono de seus costumes tradicionais","A vedação de uso de línguas maternas em sala de aula","A proibição de qualquer participação de lideranças indígenas no processo pedagógico","A exclusividade de ensino religioso católico nas aldeias"],"a":0,"e":"Art. 78, IV, da LDB: entre os objetivos dos programas de educação escolar indígena está proporcionar às comunidades indígenas o acesso às informações, conhecimentos técnicos e científicos da sociedade nacional e demais sociedades indígenas e não-índias."},{"c":"Um sindicato de professores de uma rede estadual reivindicava a edição de um plano de carreira que estabelecesse piso salarial profissional nacional para os docentes da educação básica pública, de forma a reduzir as disparidades remuneratórias entre diferentes Estados e Municípios do país. Em resposta, o governo estadual mencionou que a própria LDB prevê, entre as condições de valorização dos profissionais da educação, a existência de planos de carreira que assegurem ingresso exclusivamente por concurso público de provas e títulos.","t":"Segundo o art. 67 da LDB, os sistemas de ensino promoverão a valorização dos profissionais da educação, assegurando-lhes, inclusive nos termos dos estatutos e dos planos de carreira dos sistemas, ingresso exclusivamente por:","o":["Concurso público de provas e títulos","Indicação política direta do secretário de educação","Sorteio público anual entre candidatos inscritos","Herança de cargo entre familiares","Doação de bens à rede de ensino"],"a":0,"e":"Art. 67, I, da LDB: os sistemas de ensino promoverão a valorização dos profissionais da educação, assegurando-lhes ingresso exclusivamente por concurso público de provas e títulos para os cargos de carreira do magistério público."},{"c":"Em um processo de credenciamento de uma nova instituição de ensino superior, voltada exclusivamente a cursos de pós-graduação em nível de especialização e mestrado profissional em determinada área técnica, surgiu a dúvida sobre se essa instituição deveria obrigatoriamente se autodenominar 'universidade', já que não pretendia atuar em pesquisa básica ampla nem em múltiplas áreas do conhecimento, mas apenas em um campo de saber específico e aplicado.","t":"Segundo o art. 45 da LDB, a educação superior será ministrada em instituições de ensino superior, públicas ou privadas, com variados graus de abrangência ou especialização, e não exclusivamente em universidades, que constituem apenas uma das modalidades possíveis, ao lado de, por exemplo:","o":["Centros universitários, faculdades e institutos superiores isolados","Apenas escolas técnicas de nível médio","Apenas creches conveniadas","Apenas cursos preparatórios livres sem qualquer credenciamento","Apenas organizações não governamentais sem registro"],"a":0,"e":"Art. 45 da LDB: a educação superior será ministrada em instituições de ensino superior, públicas ou privadas, com variados graus de abrangência ou especialização, admitindo-se, além das universidades, outras modalidades como centros universitários, faculdades e institutos ou escolas superiores."},{"c":"Um grupo de professores de uma faculdade privada discutia a diferença entre instituições denominadas 'universidades' e outras modalidades de instituição de ensino superior, notando que apenas as universidades possuíam autonomia plena para criar novos cursos sem necessidade de autorização prévia específica do Ministério da Educação para cada curso, diferentemente de faculdades isoladas, que dependiam de autorização individual para cada novo curso oferecido.","t":"Esse atributo de autonomia ampliada, exclusivo das universidades, decorre diretamente do:","o":["Art. 53 da LDB, que trata da autonomia universitária","Art. 5º do ECA, que trata da proteção integral","Art. 206 da Constituição Federal, exclusivamente, sem qualquer regulamentação infraconstitucional","Regimento interno de cada faculdade isolada, independentemente de lei","Código de Defesa do Consumidor aplicado à educação"],"a":0,"e":"Art. 53 da LDB disciplina a autonomia didático-científica, administrativa e de gestão financeira e patrimonial das universidades, atribuindo-lhes prerrogativas, como a criação de cursos e programas, não extensíveis automaticamente às demais modalidades de instituição de ensino superior."},{"c":"Uma escola municipal de educação infantil, ao planejar o ano letivo, organizou toda a rotina pedagógica em torno de eixos como o cuidado, o brincar e as interações entre as crianças, evitando antecipar conteúdos tipicamente associados ao ensino fundamental, como alfabetização formal precoce ou avaliação por notas. A coordenadora pedagógica explicou aos pais que essa abordagem está alinhada à finalidade legal dessa etapa, centrada no desenvolvimento integral da criança até determinada idade, em seus aspectos físico, psicológico, intelectual e social, complementando a ação da família e da comunidade.","t":"Segundo o art. 29 da LDB, a educação infantil, primeira etapa da educação básica, tem como finalidade o desenvolvimento integral da criança de até 5 (cinco) anos, em seus aspectos físico, psicológico, intelectual e social, complementando a ação da:","o":["Família e da comunidade","Igreja e do Estado, exclusivamente","Empresa empregadora dos pais","Associação de moradores, exclusivamente","Delegacia de Proteção à Criança, exclusivamente"],"a":0,"e":"Art. 29 da LDB: a educação infantil, primeira etapa da educação básica, tem como finalidade o desenvolvimento integral da criança de até 5 anos, em seus aspectos físico, psicológico, intelectual e social, complementando a ação da família e da comunidade."},{"c":"Em uma rede estadual, o governo anunciou um amplo plano de metas educacionais para os dez anos seguintes, incluindo universalização do atendimento escolar, erradicação do analfabetismo, melhoria da qualidade do ensino e valorização dos profissionais da educação, com indicadores específicos de acompanhamento anual. Um jornalista, ao cobrir o anúncio, perguntou se esse tipo de planejamento de longo prazo era peculiaridade daquele Estado ou se derivava de uma exigência mais ampla, prevista na legislação federal de educação.","t":"O Plano Nacional de Educação, previsto no art. 9º, I, da LDB e disciplinado por lei específica, tem vigência plurianual e deve conter, entre outros elementos, diretrizes, metas e estratégias de implementação para assegurar a manutenção e desenvolvimento do ensino, em seus diversos níveis, etapas e modalidades, por meio de ações integradas dos poderes públicos das diferentes esferas federativas, em regime de:","o":["Colaboração","Competição orçamentária","Exclusividade federal, sem qualquer participação estadual ou municipal","Terceirização obrigatória para entidades privadas","Delegação integral ao setor empresarial"],"a":0,"e":"O Plano Nacional de Educação (Lei 13.005/2014), fundamentado no art. 9º, I, da LDB e no art. 214 da Constituição Federal, é elaborado em regime de colaboração entre União, Estados, Distrito Federal e Municípios, com vigência decenal e acompanhamento por metas e estratégias."},{"c":"Durante uma oficina de formação continuada, professores de diferentes redes municipais discutiram como a avaliação do rendimento escolar deveria equilibrar aspectos qualitativos e quantitativos do desempenho dos alunos, evitando que a aprovação ou reprovação dependesse exclusivamente de notas em provas, sem qualquer consideração sobre a frequência, a assiduidade e os aspects qualitativos sobre os meramente quantitativos.","t":"Segundo o art. 24, V, 'a', da LDB, na verificação do rendimento escolar, deve-se observar a avaliação contínua e cumulativa do desempenho do aluno, com prevalência dos aspectos qualitativos sobre os:","o":["Quantitativos","Disciplinares","Comportamentais","Extracurriculares","Religiosos"],"a":0,"e":"Art. 24, V, 'a', da LDB: na verificação do rendimento escolar, observar-se-á a avaliação contínua e cumulativa do desempenho do aluno, com prevalência dos aspectos qualitativos sobre os quantitativos e dos resultados ao longo do período sobre os de eventuais provas finais."},{"c":"Um aluno do ensino fundamental, com baixo desempenho em matemática durante o primeiro semestre, foi inscrito pela escola em um programa de reforço escolar paralelo às aulas regulares, com atendimento em pequenos grupos e atividades específicas voltadas às suas dificuldades, antes mesmo do fechamento do boletim final, evitando que ele chegasse ao final do ano apenas para ser reprovado sem qualquer tentativa prévia de intervenção pedagógica.","t":"Essa prática está alinhada ao art. 12, V, da LDB, que estabelece como incumbência dos estabelecimentos de ensino prover meios para a:","o":["Recuperação dos alunos de menor rendimento","Expulsão automática de alunos com baixo desempenho","Transferência compulsória para escola noturna","Retenção automática sem qualquer outra medida pedagógica","Comunicação do caso exclusivamente à imprensa local"],"a":0,"e":"Art. 12, V, da LDB: os estabelecimentos de ensino terão a incumbência de prover meios para a recuperação dos alunos de menor rendimento, reforçada também pelo art. 13, IV, que atribui aos docentes o dever de estabelecer estratégias de recuperação."},{"c":"Uma escola técnica estadual, voltada à formação profissional em nível médio, firmou parceria com empresas locais para oferecer, durante o curso, períodos de estágio supervisionado remunerado, como parte da formação prática dos alunos, sem que esse estágio descaracterizasse a natureza educacional da atividade nem gerasse vínculo empregatício automático entre aluno e empresa.","t":"A educação profissional técnica de nível médio, articulada com o ensino médio, segundo o art. 36-C e seguintes da LDB, pode ser desenvolvida de forma integrada, concomitante ou:","o":["Subsequente, oferecida a quem já tenha concluído o ensino médio","Exclusivamente paralela ao ensino fundamental","Exclusivamente anterior ao ingresso na educação infantil","Apenas em caráter de pós-graduação lato sensu","Apenas de forma totalmente informal, sem qualquer certificação"],"a":0,"e":"Arts. 36-B e 36-C da LDB (incluídos pela Lei 13.415/2017) preveem que a educação profissional técnica de nível médio pode ser desenvolvida de forma articulada com o ensino médio (integrada ou concomitante) ou subsequente, destinada a quem já é concluinte do ensino médio."},{"c":"Uma universidade pública, ao revisar seu estatuto, reafirmou o compromisso de que suas atividades não se limitariam ao ensino de graduação e pós-graduação, mas incluiriam também a produção de conhecimento científico original e a extensão de seus serviços e conhecimentos à comunidade externa, por meio de projetos sociais, culturais e tecnológicos abertos à população não vinculada formalmente à instituição.","t":"Esse tripé que estrutura a atuação das universidades, mencionado na LDB e na Constituição Federal, é formado por ensino, pesquisa e:","o":["Extensão","Apenas administração financeira","Apenas vigilância sanitária","Apenas certificação internacional","Apenas intercâmbio esportivo"],"a":0,"e":"O art. 207 da Constituição Federal, refletido na organização da educação superior pela LDB, consagra o princípio da indissociabilidade entre ensino, pesquisa e extensão como base da atuação universitária."},{"c":"Em uma escola da rede estadual, o calendário escolar previa recesso e feriados conforme normas locais, mas a direção precisou esclarecer a alunos recém-transferidos de outro Estado que, independentemente dessas variações regionais de calendário, a carga horária mínima anual de oitocentas horas e o número mínimo de dias de efetivo trabalho escolar deveriam ser necessariamente cumpridos por todas as escolas do país, sob pena de irregularidade perante o respectivo sistema de ensino.","t":"Esse patamar mínimo nacional de carga horária e dias de aula, válido tanto para o ensino fundamental quanto para o ensino médio, está previsto expressamente no:","o":["Art. 24, I, da LDB","Art. 5º da Constituição Federal, exclusivamente, sem lei complementar","Estatuto da Pessoa com Deficiência, exclusivamente","Regimento interno de cada escola, sem qualquer parâmetro nacional","Convênio bilateral entre Estados, caso a caso"],"a":0,"e":"Art. 24, I, da LDB estabelece o patamar mínimo nacional de 800 horas anuais e 200 dias de efetivo trabalho escolar, aplicável à educação básica em todo o território nacional, como norma geral da União."}];
+
+let current = 0;
+let answers = new Array(Q.length).fill(null);
+
+/* ===================== FIREBASE ===================== */
+// ⚠️ Substitua pelos dados do SEU projeto (Firebase Console → Configurações do projeto)
+const firebaseConfig = {
+  apiKey: "AIzaSyB9avRtO3rsgNnAC_9scIQRkJwf7bnRISs",
+  authDomain: "app-q-p.firebaseapp.com",
+  projectId: "app-q-p",
+  storageBucket: "app-q-p.firebasestorage.app",
+  messagingSenderId: "285418473133",
+  appId: "1:285418473133:web:4d17c53ac359c4611da824"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+const REQUESTS_COLLECTION = 'solicitacoes_ldb';
+
+/* ===================== ACESSO / CADASTRO POR E-MAIL ===================== */
+
+const STORAGE_USER_EMAIL = 'simulado_userEmail';
+
+function sanitizeEmail(email) { return email.trim().toLowerCase(); }
+function isValidEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+
+async function init() {
+  const email = localStorage.getItem(STORAGE_USER_EMAIL);
+  if (!email) { renderEmailGate(); return; }
+  await checkStatus(email);
+}
+
+async function checkStatus(email) {
+  renderLoading('Verificando seu acesso…');
+  try {
+    const snap = await db.collection(REQUESTS_COLLECTION).doc(sanitizeEmail(email)).get();
+    if (!snap.exists) { renderEmailGate(); return; }
+    const data = snap.data();
+    if (data.status === 'approved') renderStart();
+    else if (data.status === 'rejected') renderGateStatus('rejected', email);
+    else renderGateStatus('pending', email);
+  } catch (e) {
+    renderGateError('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
+  }
+}
+
+function renderLoading(msg) {
+  document.getElementById('main').innerHTML = `<div class="gate-screen"><p>${msg}</p></div>`;
+}
+
+function renderGateError(msg) {
+  document.getElementById('main').innerHTML = `
+    <div class="gate-screen">
+      <span class="status-badge rejected">Erro de conexão</span>
+      <h2>Algo deu errado</h2>
+      <p>${msg}</p>
+      <button onclick="init()">Tentar novamente</button>
+    </div>`;
+}
+
+function renderEmailGate() {
+  document.getElementById('main').innerHTML = `
+    <div class="gate-screen">
+      <h2>Cadastro de acesso</h2>
+      <p>Informe seu e-mail para solicitar acesso ao simulado. Um administrador precisa aprovar seu cadastro antes que você possa começar.</p>
+      <div class="form-field">
+        <label for="emailInput">E-mail</label>
+        <input type="email" id="emailInput" placeholder="seuemail@exemplo.com" autocomplete="email">
+      </div>
+      <div class="error-msg" id="emailError">Informe um e-mail válido.</div>
+      <button class="success" onclick="submitEmailRequest()" style="padding:14px 32px; font-size:1.05rem;">Solicitar acesso</button>
+    </div>`;
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('infoLeft').textContent = 'Cadastro necessário';
+  document.getElementById('infoRight').textContent = '58 questões';
+}
+
+async function submitEmailRequest() {
+  const input = document.getElementById('emailInput');
+  const email = sanitizeEmail(input.value);
+  const errorEl = document.getElementById('emailError');
+
+  if (!isValidEmail(email)) {
+    errorEl.classList.add('show');
+    return;
+  }
+  errorEl.classList.remove('show');
+  localStorage.setItem(STORAGE_USER_EMAIL, email);
+
+  renderLoading('Enviando solicitação…');
+  try {
+    const docRef = db.collection(REQUESTS_COLLECTION).doc(email);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      await docRef.set({
+        email,
+        status: 'pending',
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    await checkStatus(email);
+  } catch (e) {
+    renderGateError('Não foi possível enviar sua solicitação. Tente novamente em instantes.');
+  }
+}
+
+function renderGateStatus(status, email) {
+  let badge = '', title = '', text = '', extraBtn = '';
+  if (status === 'pending') {
+    badge = '<span class="status-badge pending">Aguardando aprovação</span>';
+    title = 'Solicitação enviada';
+    text = `O e-mail <strong>${email}</strong> foi registrado e está aguardando a aprovação do administrador. Volte a esta página mais tarde para verificar se o acesso já foi liberado.`;
+    extraBtn = `<button class="secondary" onclick="checkAccessAgain()">Verificar novamente</button>`;
+  } else {
+    badge = '<span class="status-badge rejected">Acesso não liberado</span>';
+    title = 'Solicitação recusada';
+    text = `O acesso para <strong>${email}</strong> não foi liberado pelo administrador. Você pode tentar com outro e-mail.`;
+    extraBtn = `<button class="secondary" onclick="useAnotherEmail()">Usar outro e-mail</button>`;
+  }
+  document.getElementById('main').innerHTML = `
+    <div class="gate-screen">
+      ${badge}
+      <h2>${title}</h2>
+      <p>${text}</p>
+      ${extraBtn}
+    </div>`;
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('infoLeft').textContent = 'Aguardando liberação';
+  document.getElementById('infoRight').textContent = '58 questões';
+}
+
+function checkAccessAgain() { init(); }
+
+function useAnotherEmail() {
+  localStorage.removeItem(STORAGE_USER_EMAIL);
+  renderEmailGate();
+}
+
+/* ===================== ÁREA DO ADMINISTRADOR ===================== */
+// Login real via Firebase Authentication (e-mail + senha criados por você no
+// Firebase Console → Authentication → Users). A proteção de verdade não é essa
+// tela: é a regra do Firestore, que só aceita aprovações vindas de alguém
+// autenticado. Assim, ninguém consegue aprovar o próprio e-mail abrindo o
+// console do navegador e chamando a função diretamente.
+
+function openAdminLogin() {
+  if (auth.currentUser) { renderAdminPanel(); return; }
+  document.getElementById('main').innerHTML = `
+    <div class="gate-screen">
+      <h2>Área do administrador</h2>
+      <p>Entre com a conta de administrador cadastrada no Firebase.</p>
+      <div class="form-field">
+        <label for="adminEmail">E-mail</label>
+        <input type="email" id="adminEmail" placeholder="admin@seudominio.com" autocomplete="username">
+      </div>
+      <div class="form-field">
+        <label for="adminPass">Senha</label>
+        <input type="password" id="adminPass" placeholder="Senha" autocomplete="current-password" onkeydown="if(event.key==='Enter') adminLogin()">
+      </div>
+      <div class="error-msg" id="adminError">E-mail ou senha incorretos.</div>
+      <button onclick="adminLogin()" style="padding:14px 32px; font-size:1.05rem;">Entrar</button>
+      <br><br>
+      <button class="secondary" onclick="init()">Voltar</button>
+    </div>`;
+  document.getElementById('infoLeft').textContent = 'Área do administrador';
+  document.getElementById('infoRight').textContent = '';
+}
+
+async function adminLogin() {
+  const email = document.getElementById('adminEmail').value.trim();
+  const pass = document.getElementById('adminPass').value;
+  const errorEl = document.getElementById('adminError');
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+    errorEl.classList.remove('show');
+    renderAdminPanel();
+  } catch (e) {
+    errorEl.classList.add('show');
+  }
+}
+
+async function renderAdminPanel() {
+  renderLoading('Carregando solicitações…');
+  document.getElementById('infoLeft').textContent = 'Área do administrador';
+
+  let all = [];
+  try {
+    const snap = await db.collection(REQUESTS_COLLECTION).get();
+    snap.forEach(doc => all.push(doc.data()));
+  } catch (e) {
+    renderGateError('Não foi possível carregar as solicitações. Verifique sua conexão e as regras do Firestore.');
+    return;
+  }
+
+  const pending = all.filter(r => r.status === 'pending');
+  const approved = all.filter(r => r.status === 'approved');
+
+  let pendingRows = pending.map(r => `
+    <tr>
+      <td>${r.email}</td>
+      <td class="admin-actions">
+        <button class="success" onclick="approveEmail('${r.email}')">Aprovar</button>
+        <button class="secondary" onclick="rejectEmail('${r.email}')">Recusar</button>
+      </td>
+    </tr>`).join('');
+  if (!pending.length) pendingRows = `<tr><td colspan="2" class="admin-empty">Nenhuma solicitação pendente.</td></tr>`;
+
+  let approvedRows = approved.map(r => `
+    <tr>
+      <td>${r.email}</td>
+      <td class="admin-actions">
+        <button class="secondary" onclick="revokeEmail('${r.email}')">Revogar acesso</button>
+      </td>
+    </tr>`).join('');
+  if (!approved.length) approvedRows = `<tr><td colspan="2" class="admin-empty">Nenhum e-mail aprovado ainda.</td></tr>`;
+
+  document.getElementById('main').innerHTML = `
+    <div class="gate-screen" style="text-align:left; max-width:700px; margin:0 auto;">
+      <h2 style="text-align:center;">Painel do administrador</h2>
+      <h3 style="color:#0d2a52; margin:22px 0 8px;">Solicitações pendentes</h3>
+      <table class="admin-table">
+        <thead><tr><th>E-mail</th><th>Ação</th></tr></thead>
+        <tbody>${pendingRows}</tbody>
+      </table>
+      <h3 style="color:#0d2a52; margin:22px 0 8px;">Acessos aprovados</h3>
+      <table class="admin-table">
+        <thead><tr><th>E-mail</th><th>Ação</th></tr></thead>
+        <tbody>${approvedRows}</tbody>
+      </table>
+      <div style="text-align:center; margin-top:20px;">
+        <button class="secondary" onclick="init()">Voltar ao simulado</button>
+        <button class="secondary" onclick="adminLogout()">Sair da conta</button>
+      </div>
+    </div>`;
+  document.getElementById('infoRight').textContent = `${pending.length} pendente(s) • ${approved.length} aprovado(s)`;
+}
+
+async function adminLogout() {
+  await auth.signOut();
+  init();
+}
+
+async function approveEmail(email) {
+  await db.collection(REQUESTS_COLLECTION).doc(email).update({ status: 'approved' });
+  renderAdminPanel();
+}
+
+async function rejectEmail(email) {
+  await db.collection(REQUESTS_COLLECTION).doc(email).update({ status: 'rejected' });
+  renderAdminPanel();
+}
+
+async function revokeEmail(email) {
+  await db.collection(REQUESTS_COLLECTION).doc(email).update({ status: 'pending' });
+  renderAdminPanel();
+}
+
+/* ===================== TELA INICIAL DO SIMULADO ===================== */
+
+function renderStart() {
+  document.getElementById('main').innerHTML = `
+    <div class="start-screen">
+      <h2>Bem-vindo(a) ao Simulado!</h2>
+      <p>Teste seus conhecimentos com <strong>58 questões contextualizadas</strong>, voltadas para concursos públicos com foco na LDB (Lei 9.394/1996).</p>
+      <ul>
+        <li>📖 <strong>Textos de apoio detalhados</strong> (leis, teorias e situações-problema)</li>
+        <li>🎯 Questões de múltipla escolha (A a E)</li>
+        <li>💡 Feedback explicativo ao final de cada questão</li>
+        <li>📊 Resultado final com revisão detalhada de todas as questões</li>
+      </ul>
+      <button class="success" onclick="startQuiz()" style="margin-top:20px; padding:14px 32px; font-size:1.1rem;">Iniciar Simulado</button>
+    </div>`;
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('infoLeft').textContent = 'Aguardando início';
+  document.getElementById('infoRight').textContent = '58 questões';
+}
+
+function startQuiz() {
+  current = 0;
+  answers = new Array(Q.length).fill(null);
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = Q[current];
+  const total = Q.length;
+  const answered = answers.filter(a => a !== null).length;
+  const correct = answers.filter((a, i) => a === Q[i].a).length;
+
+  document.getElementById('progressBar').style.width = ((current + 1) / total * 100) + '%';
+  document.getElementById('infoLeft').textContent = `Questão ${current + 1} de ${total}`;
+  document.getElementById('infoRight').textContent = `Acertos: ${correct} | Respondidas: ${answered}`;
+
+  let optionsHtml = '';
+  q.o.forEach((opt, i) => {
+    const letter = String.fromCharCode(65 + i);
+    const checked = answers[current] === i ? 'checked' : '';
+    const selectedClass = answers[current] === i ? 'selected' : '';
+    optionsHtml += `<li class="${selectedClass}" onclick="selectOption(${i})">
+      <input type="radio" name="q${current}" id="opt${i}" ${checked}>
+      <label for="opt${i}"><strong>${letter})</strong> ${opt}</label>
+    </li>`;
+  });
+
+  document.getElementById('main').innerHTML = `
+    <div class="question-card active">
+      <span class="q-number">Questão ${current + 1}</span>
+      <div class="q-context">${q.c}</div>
+      <div class="q-text">${q.t}</div>
+      <ul class="options">${optionsHtml}</ul>
+      <div class="nav-buttons">
+        <button class="secondary" onclick="prevQuestion()" ${current === 0 ? 'disabled' : ''}>← Anterior</button>
+        <button onclick="confirmAnswer()" ${answers[current] === null ? 'disabled' : ''}>Confirmar Resposta</button>
+        ${current === total - 1 ? 
+          `<button class="success" onclick="finishQuiz()">Finalizar Simulado</button>` : 
+          `<button onclick="nextQuestion()">Próxima →</button>`
+        }
+      </div>
+    </div>`;
+}
+
+function selectOption(i) {
+  answers[current] = i;
+  renderQuestion();
+}
+
+function confirmAnswer() {
+  const q = Q[current];
+  const userAnswer = answers[current];
+  const isCorrect = userAnswer === q.a;
+
+  const options = document.querySelectorAll('.options li');
+  options.forEach((li, i) => {
+    li.classList.remove('selected');
+    if (i === q.a) li.classList.add('correct');
+    if (i === userAnswer && !isCorrect) li.classList.add('wrong');
+  });
+
+  const feedbackDiv = document.createElement('div');
+  feedbackDiv.className = `feedback show ${isCorrect ? 'ok' : 'no'}`;
+  feedbackDiv.innerHTML = `<strong>${isCorrect ? '✓ Resposta correta!' : '✗ Resposta incorreta.'}</strong><br>${q.e}`;
+  document.querySelector('.question-card').appendChild(feedbackDiv);
+  document.querySelector('button[onclick="confirmAnswer()"]').disabled = true;
+}
+
+function nextQuestion() { if (current < Q.length - 1) { current++; renderQuestion(); } }
+function prevQuestion() { if (current > 0) { current--; renderQuestion(); } }
+
+function finishQuiz() {
+  const total = Q.length;
+  const correct = answers.filter((a, i) => a === Q[i].a).length;
+  const percentage = Math.round((correct / total) * 100);
+
+  let reviewHtml = '';
+  Q.forEach((q, i) => {
+    const userAns = answers[i];
+    const isCorrect = userAns === q.a;
+    const userLetter = userAns !== null ? String.fromCharCode(65 + userAns) : 'Não respondida';
+    const correctLetter = String.fromCharCode(65 + q.a);
+    reviewHtml += `<div class="review-item ${isCorrect ? 'ok' : 'no'}">
+      <strong>Questão ${i + 1}:</strong> ${isCorrect ? '✓ Correta' : '✗ Incorreta'}<br>
+      <small>Sua resposta: ${userLetter} | Correta: ${correctLetter}</small>
+    </div>`;
+  });
+
+  let message = '';
+  if (percentage >= 80) message = '🎉 Excelente! Você está muito bem preparado(a)!';
+  else if (percentage >= 60) message = '👍 Bom desempenho! Continue estudando!';
+  else if (percentage >= 40) message = '📚 Razoável. Revise os conteúdos e pratique mais!';
+  else message = '💪 Não desanime! Revise os conteúdos e continue praticando!';
+
+  document.getElementById('main').innerHTML = `
+    <div class="result-screen">
+      <h2>Resultado Final</h2>
+      <div class="score-big">${correct}/${total}</div>
+      <div class="score-bar"><div class="score-fill" style="width: ${percentage}%"></div></div>
+      <p style="font-size: 1.1rem; margin-bottom: 10px;"><strong>${percentage}% de acertos</strong></p>
+      <p style="color: #555; margin-bottom: 20px;">${message}</p>
+      <div class="review-list">
+        <h3 style="margin-bottom: 12px; color: #0d2a52;">Revisão das Questões:</h3>
+        ${reviewHtml}
+      </div>
+      <button class="success" onclick="startQuiz()" style="margin-right:10px;">Refazer Simulado</button>
+      <button class="secondary" onclick="renderStart()">Voltar ao Início</button>
+    </div>`;
+  document.getElementById('progressBar').style.width = '100%';
+  document.getElementById('infoLeft').textContent = 'Simulado finalizado';
+  document.getElementById('infoRight').textContent = `${correct} acertos de ${total}`;
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(console.error);
+  });
+}
+
+init();
+</script>
+</body>
+</html>
