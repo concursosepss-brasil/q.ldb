@@ -1,0 +1,17 @@
+{
+  "name": "Simulado - Lei de Diretrizes e Bases da Educação Nacional",
+  "short_name": "Simulado LDB",
+  "description": "Simulado interativo com questões contextualizadas sobre a LDB (Lei 9.394/1996) para concursos públicos e PSS.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f3d5c",
+  "theme_color": "#0d2a52",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
